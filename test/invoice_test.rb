@@ -57,7 +57,7 @@ module Secretariat
       )
     end
 
-    def make_eu_invoice_with_line_item_billing_period(tax_category: :REVERSECHARGE)
+    def make_eu_invoice_with_sepa_direct_debit(tax_category: :REVERSECHARGE)
       seller = TradeParty.new(
         name: 'Depfu inc',
         street1: 'Quickbornstr. 46',
@@ -109,6 +109,9 @@ module Secretariat
         paid_amount: 29,
         payment_due_date: Date.today + 14,
         notes: "This is a test invoice",
+        direct_debit_mandate_reference_id: "MANDATE REFERENCE", # BT-89
+        direct_debit_creditor_id: "DE98ZZZ09999999999", # BT-90
+        direct_debit_iban: "DE02120300000000202051", # BT-91
       )
     end
 
@@ -436,17 +439,16 @@ module Secretariat
       puts e.errors
     end
 
-    def test_simple_eu_invoice_v2_with_line_item_billing_period
+    def test_simple_eu_invoice_v2_with_sepa_direct_debit
       begin
-        xml = make_eu_invoice_with_line_item_billing_period.to_xml(version: 2)
+        xml = make_eu_invoice_with_sepa_direct_debit.to_xml(version: 2)
       rescue ValidationError => e
         pp e.errors
       end
 
-      assert_match(/<ram:CategoryCode>AE<\/ram:CategoryCode>/, xml)
-      assert_match(/<ram:ExemptionReason>Reverse Charge<\/ram:ExemptionReason>/, xml)
-      assert_match(/<ram:RateApplicablePercent>/, xml)
-      assert_match(/<ram:BillingSpecifiedPeriod>/, xml)
+      assert_match(%r{<ram:CreditorReferenceID>DE98ZZZ09999999999</ram:CreditorReferenceID>}, xml)
+      assert_match(%r{<ram:PayerPartyDebtorFinancialAccount>\s*<ram:IBANID>DE02120300000000202051\s*</ram:IBANID>}, xml)
+      assert_match(%r{<ram:DirectDebitMandateID>MANDATE REFERENCE</ram:DirectDebitMandateID>}, xml)
 
       v = Validator.new(xml, version: 2)
       errors = v.validate_against_schema
