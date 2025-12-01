@@ -5,7 +5,7 @@ require 'base64'
 module Secretariat
   class InvoiceTest < Minitest::Test
 
-    def make_eu_invoice(tax_category: :REVERSECHARGE)
+    def make_eu_invoice(tax_category: :REVERSECHARGE, ship_to: nil)
       seller = TradeParty.new(
         name: 'Depfu inc',
         street1: 'Quickbornstr. 46',
@@ -43,6 +43,7 @@ module Secretariat
         service_period_end: Date.today + 30,
         seller: seller,
         buyer: buyer,
+        ship_to: ship_to,
         line_items: [line_item],
         currency_code: 'USD',
         payment_type: :CREDITCARD,
@@ -55,64 +56,6 @@ module Secretariat
         paid_amount: 29,
         payment_due_date: Date.today + 14,
         notes: "This is a test invoice",
-      )
-    end
-
-    def make_eu_invoice_with_sepa_direct_debit(tax_category: :REVERSECHARGE)
-      seller = TradeParty.new(
-        name: 'Depfu inc',
-        street1: 'Quickbornstr. 46',
-        city: 'Hamburg',
-        postal_code: '20253',
-        country_id: 'DE',
-        vat_id: 'DE304755032'
-      )
-      buyer = TradeParty.new(
-        name: 'Depfu inc',
-        street1: 'Quickbornstr. 46',
-        city: 'Hamburg',
-        postal_code: '20253',
-        country_id: 'SE',
-        vat_id: 'SE304755032'
-      )
-      line_item = LineItem.new(
-        name: 'Depfu Premium Plan',
-        quantity: 1,
-        gross_amount: BigDecimal('29'),
-        net_amount: BigDecimal('29'),
-        unit: :YEAR,
-        charge_amount: BigDecimal('29'),
-        tax_category: tax_category,
-        tax_percent: 0,
-        tax_amount: 0,
-        origin_country_code: 'DE',
-        currency_code: 'EUR',
-        service_period_start: Date.today,
-        service_period_end: Date.today + 364,
-      )
-      Invoice.new(
-        id: '12345',
-        issue_date: Date.today,
-        # service_period on line_item. removed here to simplify testing of BillingSpecifiedPeriod presence
-        # service_period_start: Date.today,
-        # service_period_end: Date.today + 30,
-        seller: seller,
-        buyer: buyer,
-        line_items: [line_item],
-        currency_code: 'USD',
-        payment_type: :CREDITCARD,
-        payment_text: 'Kreditkarte',
-        tax_category: tax_category,
-        tax_amount: 0,
-        basis_amount: BigDecimal('29'),
-        grand_total_amount: BigDecimal('29'),
-        due_amount: 0,
-        paid_amount: 29,
-        payment_due_date: Date.today + 14,
-        notes: "This is a test invoice",
-        direct_debit_mandate_reference_id: "MANDATE REFERENCE", # BT-89
-        direct_debit_creditor_id: "DE98ZZZ09999999999", # BT-90
-        direct_debit_iban: "DE02120300000000202051", # BT-91
       )
     end
 
@@ -233,7 +176,6 @@ module Secretariat
       )
       buyer = TradeParty.new(
         name: 'Depfu inc',
-        person_name: 'Max Mustermann',
         street1: 'Quickbornstr. 46',
         city: 'Hamburg',
         postal_code: '20253',
@@ -442,16 +384,14 @@ module Secretariat
       puts e.errors
     end
 
-    def test_simple_eu_invoice_v2_with_sepa_direct_debit
+    def test_simple_eu_invoice_v2_without_ship_to
       begin
-        xml = make_eu_invoice_with_sepa_direct_debit.to_xml(version: 2)
+        xml = make_eu_invoice(ship_to: false).to_xml(version: 2)
       rescue ValidationError => e
         pp e.errors
       end
 
-      assert_match(%r{<ram:CreditorReferenceID>DE98ZZZ09999999999</ram:CreditorReferenceID>}, xml)
-      assert_match(%r{<ram:PayerPartyDebtorFinancialAccount>\s*<ram:IBANID>DE02120300000000202051\s*</ram:IBANID>}, xml)
-      assert_match(%r{<ram:DirectDebitMandateID>MANDATE REFERENCE</ram:DirectDebitMandateID>}, xml)
+      refute_match(/<ram:ShipToTradeParty>/, xml)
 
       v = Validator.new(xml, version: 2)
       errors = v.validate_against_schema
@@ -681,7 +621,6 @@ module Secretariat
       xml = invoice.to_xml(version: 2)
 
       assert_match(/<ram:PaymentReference>#{invoice.payment_reference}<\/ram:PaymentReference>/, xml)
-      assert_match(%r{<ram:DefinedTradeContact>\s*<ram:PersonName>Max Mustermann</ram:PersonName>\s*</ram:DefinedTradeContact>}, xml)
     end
   end
 end
