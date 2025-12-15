@@ -20,7 +20,8 @@ module Secretariat
 
   LineItem = Struct.new('LineItem',
     :name,
-    :quantity,
+    :quantity, # BT-129
+    :basis_quantity, # BT-149
     :unit,
     :gross_amount,
     :net_amount,
@@ -46,7 +47,7 @@ module Secretariat
     def valid?
       @errors = []
       net_price = BigDecimal(net_amount)
-      gross_price = BigDecimal(gross_amount)
+      gross_price = gross_amount && BigDecimal(gross_amount)
       charge_price = BigDecimal(charge_amount)
       tax = BigDecimal(tax_amount)
       unit_price = net_price * BigDecimal(quantity.abs)
@@ -158,7 +159,7 @@ module Secretariat
             Helpers.currency_element(xml, 'ram', 'ChargeAmount', net_amount, currency_code, add_currency: version == 1, digits: 4)
             if version == 2
               xml['ram'].BasisQuantity(unitCode: unit_code) do
-                xml.text(Helpers.format(quantity, digits: 4))
+                xml.text(Helpers.format(basis_quantity.presence || 1, digits: 4))
               end
             end
           end
