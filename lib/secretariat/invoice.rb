@@ -198,6 +198,11 @@ module Secretariat
           context = by_version(version, 'SpecifiedExchangedDocumentContext', 'ExchangedDocumentContext')
 
           xml['rsm'].send(context) do
+            if version == 2
+              xml['ram'].BusinessProcessSpecifiedDocumentContextParameter do
+                xml['ram'].ID "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0"
+              end
+            end
             xml['ram'].GuidelineSpecifiedDocumentContextParameter do
               version_id = by_version(version, 'urn:ferd:CrossIndustryDocument:invoice:1p0:comfort', 'urn:cen.eu:en16931:2017')
               xml['ram'].ID version_id
@@ -281,7 +286,7 @@ module Secretariat
               xml['ram'].InvoiceCurrencyCode currency_code
               xml['ram'].SpecifiedTradeSettlementPaymentMeans do
                 xml['ram'].TypeCode payment_code
-                xml['ram'].Information payment_text
+                xml['ram'].Information payment_text if payment_text # BT-82
                 if payment_iban || payment_payee_account_name
                   xml['ram'].PayeePartyCreditorFinancialAccount do
                     xml['ram'].IBANID payment_iban if payment_iban
