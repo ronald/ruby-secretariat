@@ -20,7 +20,8 @@ module Secretariat
   TradeParty = Struct.new('TradeParty',
     :id,
     :name, :street1, :street2, :city, :postal_code, :country_id, :vat_id, :global_id, :global_id_scheme_id, :tax_id,
-    :person_name,
+    :email,
+    :person_name, :contact_phone, :contact_email,
     keyword_init: true,
   ) do
     def to_xml(xml, exclude_tax: false, version: 2)
@@ -33,9 +34,23 @@ module Secretariat
         end
       end
       xml['ram'].Name name
-      if person_name
+      if person_name || contact_phone || contact_email
         xml['ram'].DefinedTradeContact do
-          xml['ram'].PersonName person_name
+          if person_name
+            xml['ram'].PersonName person_name
+          end
+          if contact_phone
+            xml['ram'].TelephoneUniversalCommunication do
+              xml['ram'].CompleteNumber contact_phone # BT-42 seller
+            end
+          end
+          if contact_email
+            xml['ram'].EmailURIUniversalCommunication do
+              xml['ram'].URIID(schemeID: "EM") do
+                xml.text(contact_email) # BT-43 seller | BT-58 buyer
+              end
+            end
+          end
         end
       end
       xml['ram'].PostalTradeAddress do
@@ -46,6 +61,13 @@ module Secretariat
         end
         xml['ram'].CityName city
         xml['ram'].CountryID country_id
+      end
+      if email
+        xml['ram'].URIUniversalCommunication do
+          xml['ram'].URIID(schemeID: "EM") do
+            xml.text(email) # BT-34 seller
+          end
+        end
       end
       if !exclude_tax && vat_id.present?
         xml['ram'].SpecifiedTaxRegistration do
